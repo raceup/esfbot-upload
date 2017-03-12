@@ -7,12 +7,12 @@
 ```
 $ pip3 install bs4 pyhal
 ```
-*Better run the `bot/bot.py` driver and check if all dependencies are satisfied.*
+*Better run the [script](bot/bot.py) and check if all dependencies are satisfied.*
 
 
 ## Usage
 ```
-$ python3 `bot/bot.py`
+$ python3 bot/bot.py
 ```
 and you're done: wait for it to complete.
 

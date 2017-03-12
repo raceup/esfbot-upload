@@ -8,6 +8,9 @@ All notable changes to this project will be documented in this file.
 - esf .csv raw data
 - FSGermanyEsfUploadBot
 
+### Fixed
+- README formatting
+
 ## 0.0 - 2017-03-12
 
 ### Created
