@@ -12,7 +12,7 @@ $ pip3 install bs4 pyhal
 
 ## Usage
 ```
-$ python3 bot/bot.py
+$ python3 bot/bot.py -u <your fsg username> -p <your fsg password> -d <path to data folder>
 ```
 and you're done: wait for it to complete.
 
