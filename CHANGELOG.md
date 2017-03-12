@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 - scraper bot module
+- esf .csv raw data
+- FSGermanyEsfUploadBot
 
 ## 0.0 - 2017-03-12
 

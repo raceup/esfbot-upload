@@ -1,7 +1,7 @@
 # !/usr/bin/python
-# coding: utf_8
+# coding: utf-8
 
-# Copyright 2016 Stefano Fogarollo
+# Copyright 2017 Stefano Fogarollo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,8 +18,7 @@
 
 import argparse
 
-from esfbot.fsg import fsg
-from esfbot.fsg import crawler
+from .fsg import fsg
 
 
 def create_args():
@@ -46,20 +45,9 @@ def parse_args(parser):
     return str(args.user), str(args.password)
 
 
-def get_login_credentials():
-    """
-    :return: tuple string, string
-        user, password
-    """
-
-    return parse_args(create_args())  # get credentials from command line
-
-
 if __name__ == "__main__":
-    user, password = get_login_credentials()  # get credentials
+    user, password = parse_args(create_args())  # get credentials from command line
     bot = fsg.FSGermanyBot()  # bot to scrape
 
     print("Logging in...")
     bot.login(user, password)  # login to access members-only data
-
-    crawler.download_all_esf(bot)

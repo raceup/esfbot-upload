@@ -1,7 +1,7 @@
 # !/usr/bin/python
-# coding: utf_8
+# coding: utf-8
 
-# Copyright 2016 Stefano Fogarollo
+# Copyright 2017 Stefano Fogarollo
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,19 +18,53 @@
 
 import os
 import time
-from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from hal.internet.selenium import SeleniumForm
-from hal.internet.parser import html_stripper
 
+from bs4 import BeautifulSoup
+from hal.internet.parser import html_stripper
+from hal.internet.selenium import SeleniumForm
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 PATH_TO_THIS_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 PATH_TO_CHROMEDRIVER = os.path.join(PATH_TO_THIS_DIRECTORY, "chromedriver")  # to proper work with selenium
 OUTPUT_FOLDER = os.path.join(PATH_TO_THIS_DIRECTORY, "esf", str(int(time.time())))
 BROWSER_WAIT_TIMEOUT_SECONDS = 2
+
+
+def close_alert_in_time(driver, max_time):
+    """
+    :param driver: selenium web driver
+        web driver to use
+    :param max_time: int
+        Max seconds to wait for alert
+    :return: void
+        Close all alerts popping up in max_time seconds interval
+    """
+
+    max_time_wait = time.time() + max_time
+    is_alert_dismissed = False
+    while time.time() < max_time_wait and not is_alert_dismissed:
+        if is_alert_dismissed:  # can exit loop
+            break
+        try:
+            driver.switch_to.alert.accept()  # discard any pop-up
+            is_alert_dismissed = True
+        except:
+            time.sleep(0.2)
+
+
+def navigate_to_prev_page(driver):
+    """
+    :param driver: selenium web driver
+        web driver to use
+    :return: void
+        force web driver to get to previous page
+    """
+
+    driver.execute_script("window.history.go(-1)")  # go back
+    driver.refresh()  # refresh page
 
 
 class ESFFormSection(object):
@@ -48,7 +82,8 @@ class ESFFormSection(object):
 
         self.name = name
         self.table = table
-        self.data = None
+        self.data = None  # 2D matrix that contain all values from html table
+        self.upload_items = []  # TODO parse list of dict <key: name of value to upload, value: id of item>
         self.show_functions = []  # javascript show methods to show extra data
 
     def parse(self, browser):
@@ -65,7 +100,7 @@ class ESFFormSection(object):
                 Get javascript methods to open esf sections and return table data
             """
 
-            data = []  # output table that contain all values from html table
+            data = []  # output 2D matrix that contain all values from html table
             for row in self.table.find_all("tr"):  # cycle through all rows
                 row_items = []  # array of elements of this row
                 for column_label in row.find_all("th"):
@@ -79,7 +114,6 @@ class ESFFormSection(object):
                         pass
                     row_items.append(html_stripper(column.text))  # get new table entry
                 data.append(row_items)  # append row
-
             return data
 
         print("\t", self.name)  # debug only
@@ -93,6 +127,7 @@ class ESFFormSection(object):
 
         self.data = data
 
+    # TODO can we remove this method?
     @staticmethod
     def parse_inner_table(browser):
         """
@@ -127,6 +162,8 @@ class ESFForm(object):
 
     def __init__(self, name, status, show_function):
         """
+        :param browser: webdriver
+            Browser to use.
         :param name: string
             Name of form
         :param status: string
@@ -150,7 +187,6 @@ class ESFForm(object):
             Show this form.
         """
 
-        print(self.name)
         browser.execute_script(self.show_function)  # go to page of esf form
         WebDriverWait(browser, BROWSER_WAIT_TIMEOUT_SECONDS).until(
             EC.presence_of_element_located((By.NAME, "submit"))
@@ -170,10 +206,43 @@ class ESFForm(object):
             sections.append(section)  # add just found section
 
         self.sections = sections
-        browser.execute_script("window.history.go(-1)")  # back of one page in history to restore browser state
+        navigate_to_prev_page(browser)  # back of one page in history to restore browser state
+
+        return self.sections
 
 
-class ESFSraper(object):
+class ESFFormBot(object):
+    """ ESF form bot to upload this form only to FSG webpage """
+
+    def __init__(self, browser, form):
+        """
+        :param browser: webdriver
+            Browser to use.
+        :param form: ESFForm
+            Form to upload
+        """
+
+        object.__init__(self)
+
+        self.browser = browser
+        self.form = form
+
+    def upload_data(self, data_file_to_upload):
+        """
+        :param data_file_to_upload: str
+            Path to .csv file containing subsections data to upload
+        :return: void
+            Uploads data of all subsections in this form
+        """
+
+        self.form.get_sub_sections()  # get list of form subsections
+        for subsection in self.form.sections:
+            # TODO now a subsection has the list 'upload_items': dict <key: name of value to upload, value: id of item>
+            # find in data file this value, then call browser to put file value into webpage id
+            pass
+
+
+class ESFFormScraperBot(object):
     """ Scrape ESF from FSG webpage """
 
     ESF_URL = "https://www.formulastudent.de/esf"
@@ -188,13 +257,13 @@ class ESFSraper(object):
 
         self.browser = browser
 
-    def get_esf_list(self):
+    def get_esf_form_sections(self):
         """
         :return: list of ESFForm
             ESFForm parsed from given raw html table
         """
 
-        self.browser.get(ESFSraper.ESF_URL)  # go to list of ESFs
+        self.browser.get(ESFFormScraperBot.ESF_URL)  # go to list of ESFs
 
         soup = BeautifulSoup(self.browser.page_source, "html.parser")  # parse source page
         table = soup.find_all("table", {"class": "overview"})[0]
@@ -214,7 +283,50 @@ class ESFSraper(object):
         return esf_list
 
 
-class FSGermanyLogin(object):
+class FSGermanyEsfUploadBot(object):
+    """ Bot to upload esf to FSG webpage """
+
+    ESF_URL = "https://www.formulastudent.de/esf"
+
+    def __init__(self, browser, data_folder):
+        """
+        :param browser: web-driver
+            Browser to use.
+        :param data_folder: str
+            Path to folder containing esf data
+        """
+
+        object.__init__(self)
+
+        self.browser = browser
+        self.data_folder = data_folder
+
+    def upload_data(self):
+        """
+        :return: void
+            Uploads text of all esf section to esf webpage
+        """
+
+        bot = ESFFormScraperBot(self.browser)  # build bot to scrape esf main page
+        esf_form_sections = bot.get_esf_form_sections()  # find all esf form sections
+        for section in esf_form_sections:
+            print("Uploading section", section.name)
+            self._upload_data_of_section(section)
+
+    def _upload_data_of_section(self, esf_form_section):
+        """
+        :param esf_form_section: ESFForm
+            Esf form section
+        :return: void
+            Uploads data of selected section
+        """
+
+        bot = ESFFormBot(self.browser, esf_form_section)  # build bot to upload single form section7
+        # TODO find section file in data folder
+        # bot.upload(data_file)
+
+
+class FSGermanyLoginBot(object):
     """ Bot to perform login in FSG webpage """
 
     LOGIN_URL = "https://www.formulastudent.de/l/?redirect_url=%2F"
@@ -241,10 +353,12 @@ class FSGermanyLogin(object):
             Login in FSG website.
         """
 
-        self.browser.get(FSGermanyLogin.LOGIN_URL)  # open login url
-        SeleniumForm.fill_login_form(self.browser,
-                                      self.user, "user",
-                                      self.password, "pass")  # fill login form
+        self.browser.get(FSGermanyLoginBot.LOGIN_URL)  # open login url
+        SeleniumForm.fill_login_form(
+            self.browser,
+            self.user, "user",
+            self.password, "pass"
+        )  # fill login form
         SeleniumForm.submit_form(self.browser, "submit")  # press login button
         WebDriverWait(self.browser, BROWSER_WAIT_TIMEOUT_SECONDS).until(
             EC.presence_of_element_located((By.ID, "c2106"))
@@ -269,100 +383,19 @@ class FSGermanyBot(object):
             Login in FSG website.
         """
 
-        bot = FSGermanyLogin(self.browser, user, password)  # create bot for login
+        bot = FSGermanyLoginBot(self.browser, user, password)  # create bot for login
         bot.login()  # perform login
 
-    def get_esf_to_csv(self):
+    def upload_esf(self, data_folder):
         """
+        :param data_folder: str
+            Path to folder containing esf data
         :return: void
-            ESF form to .csv format
+            Uploads text of all esf section to esf webpage
         """
 
-        if not os.path.exists(OUTPUT_FOLDER):  # create output directory
-            os.makedirs(OUTPUT_FOLDER)
-
-        bot = ESFSraper(self.browser)
-        esf_list = bot.get_esf_list()
-        for esf in esf_list:
-            esf.get_sections(self.browser)  # get all sections of form
-            out_filename = os.path.join(OUTPUT_FOLDER, esf.name + ".csv")
-            with open(out_filename, "w") as o:
-                for section in esf.sections:
-                    section_csv = "\"" + str(section.name) + "\"" + "\n"  # add name of section
-                    for row in section.data:
-                        row_csv = ""
-                        for value in row:
-                            row_csv += "\"" + str(value) + "\"" + ","  # create a .csv row with " as text delimiter
-                        section_csv += row_csv + "\n"  # add just created row
-                    section_csv += "\n"
-                    o.write(section_csv + "\n")  # write all sections of form
-
-    def get_all_esf_to_csv(self, items):
-        """
-        :param items: list
-            list of int, each int is the item to download the esf of
-        :return: void
-            All ESF forms to .csv format
-        """
-
-        def close_alert_in_time(driver, max_time):
-            """
-            :param driver: selenium web driver
-                web driver to use
-            :param max_time: int
-                Max seconds to wait for alert
-            :return: void
-                Close all alerts popping up in max_time seconds interval
-            """
-
-            max_time_wait = time.time() + max_time
-            is_alert_dismissed = False
-            while time.time() < max_time_wait and not is_alert_dismissed:
-                if is_alert_dismissed:  # can exit loop
-                    break
-                try:
-                    driver.switch_to.alert.accept()  # discard any pop-up
-                    is_alert_dismissed = True
-                except:
-                    time.sleep(0.2)
-        
-        if not os.path.exists(OUTPUT_FOLDER):  # create output directory
-            os.makedirs(OUTPUT_FOLDER)
-
-        bot = ESFSraper(self.browser)
-        esf_form = bot.get_esf_list()[0]  # get an esf form: it's the same with the others
-
-        self.browser.execute_script(esf_form.show_function)  # go to page of esf form
-        WebDriverWait(self.browser, BROWSER_WAIT_TIMEOUT_SECONDS).until(
-            EC.presence_of_element_located((By.NAME, "submit"))
-        )  # wait until fully loaded
-
-        for i in items:  # loop through functions to execute
-            out_filename = os.path.join(OUTPUT_FOLDER, str(i) + ".csv")  # file to write output
-            javascript_function_to_show_item = "showItem(" + str(i) + ");"  # js function to open esf table
-            print("Getting item ", i)
-
-            data = []  # data of table
-            self.browser.execute_script(javascript_function_to_show_item)  # open table
-            close_alert_in_time(self.browser, BROWSER_WAIT_TIMEOUT_SECONDS)
-
-            try:
-                print("Parsing item ", i)
-                inner_data = ESFFormSection.parse_inner_table(self.browser)  # get data from table
-                for row in inner_data:
-                    data.append(row)  # add to table data
-
-                with open(out_filename, "w") as o:  # write output file
-                    section_csv = "\"" + str(i) + "\"" + "\n"  # add name of section
-                    for row in data:
-                        row_csv = ""
-                        for value in row:
-                            row_csv += "\"" + str(value) + "\"" + ","  # create a .csv row with " as text delimiter
-                        section_csv += row_csv + "\n"  # add just created row
-                    section_csv += "\n"
-                    o.write(section_csv + "\n")  # write all sections of form
-            except:
-                print("Failed getting item ", i)
+        bot = FSGermanyEsfUploadBot(self.browser, data_folder)
+        bot.upload_data()
 
     def exit(self):
         self.browser.close()
