@@ -1,21 +1,15 @@
-# ESF Bot uploader
-
-*Python bot to upload `esf` sections to Formula Student Germany website*
-
+<div align="center">
+<h1>ESF Bot | upload</h1>
+<em>Bot to upload ESF sections to Formula Student Germany website</em></br></br>
+</div>
 
 ## Install
-```
+0. install dependencies with
+```bash
 $ pip3 install bs4 pyhal
 ```
-*Better run the [script](bot/bot.py) and check if all dependencies are satisfied.*
-
 
 ## Usage
-```
+```bash
 $ python3 bot/bot.py -u <your fsg username> -p <your fsg password> -d <path to data folder>
 ```
-and you're done: wait for it to complete.
-
-
-## License
-[Apache License](http://www.apache.org/licenses/LICENSE-2.0) Version 2.0, January 2004
